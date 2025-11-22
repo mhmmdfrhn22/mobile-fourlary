@@ -1,9 +1,12 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import '../../viewmodels/auth_viewmodel.dart';
+import 'package:flutter/gestures.dart'; // This is important for TapGestureRecognizer
+import 'package:shared_preferences/shared_preferences.dart'; // For SharedPreferences
+import 'dart:convert'; // For JSON decoding
+import 'package:http/http.dart' as http; // For API request
 import 'register_view.dart';
+import 'forgotpassword_view.dart'; // Import the Forgot Password view
 
 class LoginView extends StatefulWidget {
   const LoginView({super.key});
@@ -14,48 +17,89 @@ class LoginView extends StatefulWidget {
 
 class _LoginPageState extends State<LoginView> {
   bool _obscurePassword = true;
-  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
+  // API URL for login
+  final String apiUrl =
+      'https://backend-fourlary-production.up.railway.app/api/user/login';
+
+  // Function to handle the login
   Future<void> _handleLogin() async {
-    final vm = Provider.of<AuthViewModel>(context, listen: false);
-    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
     final password = _passwordController.text.trim();
 
-    if (username.isEmpty || password.isEmpty) {
+    if (email.isEmpty || password.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Username dan password tidak boleh kosong'),
-        ),
+        const SnackBar(content: Text('Email dan password tidak boleh kosong')),
       );
       return;
     }
 
-    await vm.login(username, password);
-
-    if (vm.error != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(vm.error!), backgroundColor: Colors.red),
+    try {
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({"email": email, "password": password}),
       );
-    } else if (vm.user != null) {
+
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        // If login successful
+        final userData = {
+          'id': data['user']['id'],
+          'username': data['user']['username'],
+          'email': data['user']['email'],
+          'role_id': data['user']['role_id'],
+        };
+
+        // Save user data to SharedPreferences
+        await _saveUserData(userData);
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Selamat datang, ${data['user']['username']}!'),
+            backgroundColor: Colors.green,
+          ),
+        );
+
+        // Navigate to home page
+        Future.delayed(const Duration(milliseconds: 800), () {
+          Navigator.pushReplacementNamed(context, '/home');
+        });
+      } else {
+        // If login fails
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(data['message'] ?? 'Email atau password salah'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    } catch (error) {
+      print('Login error: $error');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Selamat datang, ${vm.user!.username}!'),
-          backgroundColor: Colors.green,
+        const SnackBar(
+          content: Text('Terjadi kesalahan, coba lagi nanti'),
+          backgroundColor: Colors.red,
         ),
       );
-
-      // ✅ arahkan langsung ke halaman home
-      Future.delayed(const Duration(milliseconds: 800), () {
-        Navigator.pushReplacementNamed(context, '/home');
-      });
     }
+  }
+
+  // Function to save user data to SharedPreferences
+  Future<void> _saveUserData(Map<String, dynamic> userData) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    prefs.setInt('userId', userData['id']);
+    prefs.setString('username', userData['username']);
+    prefs.setString('email', userData['email']);
+    prefs.setInt('role_id', userData['role_id']);
+    prefs.setBool('isLoggedIn', true); // Set login status to true
   }
 
   @override
   Widget build(BuildContext context) {
-    final vm = Provider.of<AuthViewModel>(context);
-
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -84,20 +128,20 @@ class _LoginPageState extends State<LoginView> {
               ),
               const SizedBox(height: 40),
 
-              // Username
+              // Email Input
               Text(
-                'Username Anda',
+                'Email Anda',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 6),
               TextFormField(
-                controller: _usernameController,
-                keyboardType: TextInputType.text,
-                decoration: _inputDecoration('Masukkan username'),
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: _inputDecoration('Masukkan email'),
               ),
               const SizedBox(height: 20),
 
-              // Password
+              // Password Input
               Text(
                 'Password Anda',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
@@ -127,7 +171,15 @@ class _LoginPageState extends State<LoginView> {
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () {},
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) =>
+                            const ForgotPasswordView(), // Link to Forgot Password page
+                      ),
+                    );
+                  },
                   child: Text(
                     'Lupa Password?',
                     style: GoogleFonts.poppins(
@@ -139,7 +191,7 @@ class _LoginPageState extends State<LoginView> {
               ),
               const SizedBox(height: 16),
 
-              // Tombol login
+              // Login Button
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -150,23 +202,14 @@ class _LoginPageState extends State<LoginView> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  onPressed: vm.isLoading ? null : _handleLogin,
-                  child: vm.isLoading
-                      ? const SizedBox(
-                          height: 22,
-                          width: 22,
-                          child: CircularProgressIndicator(
-                            color: Colors.white,
-                            strokeWidth: 2,
-                          ),
-                        )
-                      : Text(
-                          'Masuk',
-                          style: GoogleFonts.poppins(
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
+                  onPressed: _handleLogin,
+                  child: Text(
+                    'Masuk',
+                    style: GoogleFonts.poppins(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 32),

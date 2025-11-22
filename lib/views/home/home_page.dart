@@ -1,44 +1,120 @@
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:intl/intl.dart'; // Add this import for date formatting
+import '../news/news_detail_page.dart';
 import '../main_layout.dart';
 import '../auth/login_view.dart';
-import '../news/news_detail_page.dart';
+import '../pembinat/pembinat_page.dart'; // Add this import for Pembinat page
+import 'package:shared_preferences/shared_preferences.dart'; // For SharedPreferences
 
-class HomePage extends StatelessWidget {
+class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> newsList = [
-      {
-        'image': 'assets/images/gambar1.JPG',
-        'title': 'Pemenang Kejuaraan Lomba Teknologi Nasional',
-        'author': 'Desain Media Visual',
-        'date': 'Feb 27, 2025',
-        'category': 'Prestasi',
-        'content':
-            'Volleyball players require strength, agility, and endurance training to perform their best. This includes plyometrics, cardio, and flexibility workouts...',
-      },
-      {
-        'image': 'assets/images/gambar2.JPG',
-        'title': 'Kira Kira Kapan Diadakannya Acara Transforkrab Selanjutnya?',
-        'author': 'PDD OSIS',
-        'date': 'Feb 28, 2025',
-        'category': 'Acara',
-        'content':
-            'Parents usually find out about secondary school placements in March. The process varies by country and local education authority...',
-      },
-      {
-        'image': 'https://picsum.photos/200/120?3',
-        'title': '6 Houses Destroyed In Massive Fire In Assam\'s K.',
-        'author': 'Aslam K.',
-        'date': 'Mar 02, 2023',
-        'category': 'World',
-        'content':
-            'A massive fire broke out in a residential area of Assam, destroying six houses. Firefighters managed to control the blaze after two hours...',
-      },
-    ];
+  _HomePageState createState() => _HomePageState();
+}
 
+class _HomePageState extends State<HomePage> {
+  List<Map<String, dynamic>> newsList = [];
+  List<Map<String, dynamic>> galleryList = [];
+  String username = "";
+  String profileLetter = "";
+
+  @override
+  void initState() {
+    super.initState();
+    fetchNews(); // Fetch news on page load
+    fetchGallery(); // Fetch gallery images on page load
+    _getUserData(); // Get user data from SharedPreferences
+  }
+
+  // Function to get user data from SharedPreferences
+  Future<void> _getUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    String? storedUsername = prefs.getString('username');
+    setState(() {
+      username = storedUsername ?? "User";
+      profileLetter = username.isNotEmpty ? username[0].toUpperCase() : '';
+    });
+  }
+
+  // Fetch latest news from API
+  Future<void> fetchNews() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://backend-fourlary-production.up.railway.app/api/posts',
+        ),
+      );
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+        setState(() {
+          newsList = data.take(2).map((news) {
+            return {
+              'image':
+                  news['url_foto'] ??
+                  'https://res.cloudinary.com/dprywyfwm/image/upload/v1762822108/uploads/placeholder-berita.png',
+              'title': news['judul'],
+              'author': news['penulis'] ?? 'Unknown',
+              'date': formatDate(
+                news['created_at'] ?? 'No Date',
+              ), // Format date
+              'category': news['kategori'] ?? 'Uncategorized',
+              'content': news['isi'] ?? '',
+            };
+          }).toList();
+        });
+      } else {
+        throw Exception('Failed to load news');
+      }
+    } catch (e) {
+      print('Error fetching news: $e');
+    }
+  }
+
+  // Fetch latest gallery images from API
+  Future<void> fetchGallery() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          'https://backend-fourlary-production.up.railway.app/api/foto',
+        ),
+      );
+      if (response.statusCode == 200) {
+        List<dynamic> data = json.decode(response.body);
+        setState(() {
+          galleryList = data.take(4).map((item) {
+            // Fetch more images if needed
+            return {
+              'image': item['url_foto'],
+              'caption': item['deskripsi'] ?? 'No description',
+            };
+          }).toList();
+        });
+      } else {
+        throw Exception('Failed to load gallery');
+      }
+    } catch (e) {
+      print('Error fetching gallery: $e');
+    }
+  }
+
+  // Function to format the date (YYYY-MM-DD)
+  String formatDate(String dateString) {
+    try {
+      final DateTime date = DateTime.parse(dateString);
+      return DateFormat(
+        'yyyy-MM-dd',
+      ).format(date); // Format date to year-month-day
+    } catch (e) {
+      return dateString; // Return original string if parsing fails
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return SafeArea(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
@@ -52,7 +128,7 @@ class HomePage extends StatelessWidget {
                 children: [
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
+                    children: [
                       Text(
                         'Selamat Pagi,',
                         style: TextStyle(
@@ -63,7 +139,7 @@ class HomePage extends StatelessWidget {
                       ),
                       SizedBox(height: 4),
                       Text(
-                        'Muhammad Farhan👋',
+                        'Hello, ${username.split(' ')[0]} 👋', // Display first name
                         style: TextStyle(
                           fontSize: 22,
                           fontWeight: FontWeight.w700,
@@ -72,8 +148,6 @@ class HomePage extends StatelessWidget {
                       ),
                     ],
                   ),
-                  // 🔹 Avatar lingkaran
-                  // 🔹 Avatar Profile
                   GestureDetector(
                     onTap: () {
                       showModalBottomSheet(
@@ -123,16 +197,20 @@ class HomePage extends StatelessWidget {
                         ),
                       );
                     },
-                    child: const CircleAvatar(
+                    child: CircleAvatar(
                       radius: 26,
-                      backgroundImage: AssetImage('assets/images/cat.jpg'),
+                      child: Text(
+                        profileLetter, // Display first letter of username
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
                 ],
               ),
-
-              const SizedBox(height: 20),
-
+              SizedBox(height: 20),
               // 🔹 Search bar
               Container(
                 decoration: BoxDecoration(
@@ -164,7 +242,6 @@ class HomePage extends StatelessWidget {
                   ],
                 ),
               ),
-
               const SizedBox(height: 20),
 
               // 🔹 Banner Pembinat
@@ -200,7 +277,14 @@ class HomePage extends StatelessWidget {
                           ),
                           const SizedBox(height: 8),
                           ElevatedButton(
-                            onPressed: () {},
+                            onPressed: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => const PembinatPage(),
+                                ),
+                              );
+                            },
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF007BFF),
                               shape: RoundedRectangleBorder(
@@ -234,7 +318,6 @@ class HomePage extends StatelessWidget {
                   ],
                 ),
               ),
-
               const SizedBox(height: 24),
 
               // 🔹 Judul section berita
@@ -269,12 +352,11 @@ class HomePage extends StatelessWidget {
                   ),
                 ],
               ),
-
               const SizedBox(height: 12),
 
               // 🔹 List berita singkat
               Column(
-                children: newsList.take(2).map((news) {
+                children: newsList.map((news) {
                   return GestureDetector(
                     onTap: () {
                       Navigator.push(
@@ -304,7 +386,7 @@ class HomePage extends StatelessWidget {
                               topLeft: Radius.circular(20),
                               bottomLeft: Radius.circular(20),
                             ),
-                            child: Image.asset(
+                            child: Image.network(
                               news['image'],
                               width: 110,
                               height: 100,
@@ -367,9 +449,9 @@ class HomePage extends StatelessWidget {
                   );
                 }).toList(),
               ),
+              const SizedBox(height: 24),
 
               // 🔹 Section Galeri Terbaru (balik lagi)
-              const SizedBox(height: 24),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -403,30 +485,27 @@ class HomePage extends StatelessWidget {
               ),
               const SizedBox(height: 12),
 
-              Row(
-                children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Image.network(
-                        'https://picsum.photos/200/200?4',
-                        height: 120,
-                        fit: BoxFit.cover,
-                      ),
+              // 🔹 Gallery images with better separation
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                ),
+                itemCount: galleryList.length,
+                itemBuilder: (context, index) {
+                  final gallery = galleryList[index];
+                  return ClipRRect(
+                    borderRadius: BorderRadius.circular(16),
+                    child: Image.network(
+                      gallery['image'],
+                      height: 120,
+                      fit: BoxFit.cover,
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: Image.network(
-                        'https://picsum.photos/200/200?5',
-                        height: 120,
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  ),
-                ],
+                  );
+                },
               ),
             ],
           ),

@@ -1,7 +1,10 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'login_view.dart'; // biar bisa navigasi balik ke login
+import 'package:http/http.dart' as http;
+import 'dart:convert'; // For JSON decoding
+import 'otp_view.dart'; // Import OTP view for redirection
+import 'login_view.dart'; // To navigate back to login
+import 'package:flutter/gestures.dart'; // This is important for TapGestureRecognizer
 
 class RegisterView extends StatefulWidget {
   const RegisterView({super.key});
@@ -13,6 +16,118 @@ class RegisterView extends StatefulWidget {
 class _RegisterPageState extends State<RegisterView> {
   bool _obscurePassword = true;
   bool _agreeTerms = false;
+  bool _isRegistering = false; // Track if registration is in progress
+  final _usernameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _confirmEmailController = TextEditingController();
+  final _passwordController = TextEditingController();
+
+  // API URL for registration
+  final String apiUrl =
+      'https://backend-fourlary-production.up.railway.app/api/user/register';
+
+  // Function to handle the registration
+  // Function to handle the registration
+  Future<void> _handleRegister() async {
+    if (_isRegistering) return; // Prevent multiple clicks
+    setState(() {
+      _isRegistering = true; // Disable the button and prevent further clicks
+    });
+
+    final username = _usernameController.text.trim();
+    final email = _emailController.text.trim();
+    final confirmEmail = _confirmEmailController.text.trim();
+    final password = _passwordController.text.trim();
+
+    if (email != confirmEmail) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Email dan konfirmasi email harus sama')),
+      );
+      setState(() {
+        _isRegistering = false;
+      });
+      return;
+    }
+
+    if (!_agreeTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Anda harus setuju dengan Kebijakan Privasi'),
+        ),
+      );
+      setState(() {
+        _isRegistering = false;
+      });
+      return;
+    }
+
+    try {
+      final response = await http.post(
+        Uri.parse(apiUrl),
+        headers: {"Content-Type": "application/json"},
+        body: json.encode({
+          "username": username,
+          "email": email,
+          "confirmEmail": confirmEmail,
+          "password": password,
+          "role_id": 1, // Default role_id as 1
+        }),
+      );
+
+      final data = json.decode(response.body);
+
+      if (response.statusCode == 200) {
+        // Success - OTP sent
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'OTP telah dikirim! Cek email Anda untuk melanjutkan verifikasi.',
+            ),
+          ),
+        );
+
+        // Navigate to OTP verification page after successful registration
+        Future.delayed(const Duration(seconds: 1), () {
+          setState(() {
+            _isRegistering = false; // Re-enable the button after navigation
+          });
+          // Pass the userId from registration response to OTPView
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  OTPView(userId: data['id'].toString()), // Convert to String
+            ),
+          );
+        });
+      } else {
+        // Error in registration
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              data['message'] ??
+                  'Terjadi kesalahan pada data yang Anda masukkan',
+            ),
+          ),
+        );
+        setState(() {
+          _isRegistering = false;
+        });
+      }
+    } catch (e) {
+      print(e);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Terjadi kesalahan jaringan atau server tidak dapat dijangkau',
+          ),
+        ),
+      );
+      setState(() {
+        _isRegistering = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -44,13 +159,16 @@ class _RegisterPageState extends State<RegisterView> {
               ),
               const SizedBox(height: 40),
 
-              // Nama
+              // Username
               Text(
                 'Nama Panggilan',
                 style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
               ),
               const SizedBox(height: 6),
-              TextFormField(decoration: _inputDecoration('Nama Lengkap')),
+              TextFormField(
+                controller: _usernameController,
+                decoration: _inputDecoration('Nama Lengkap'),
+              ),
               const SizedBox(height: 20),
 
               // Email
@@ -60,6 +178,20 @@ class _RegisterPageState extends State<RegisterView> {
               ),
               const SizedBox(height: 6),
               TextFormField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                decoration: _inputDecoration('example@email.com'),
+              ),
+              const SizedBox(height: 20),
+
+              // Confirm Email
+              Text(
+                'Konfirmasi Email',
+                style: GoogleFonts.poppins(fontWeight: FontWeight.w500),
+              ),
+              const SizedBox(height: 6),
+              TextFormField(
+                controller: _confirmEmailController,
                 keyboardType: TextInputType.emailAddress,
                 decoration: _inputDecoration('example@email.com'),
               ),
@@ -72,6 +204,7 @@ class _RegisterPageState extends State<RegisterView> {
               ),
               const SizedBox(height: 6),
               TextFormField(
+                controller: _passwordController,
                 obscureText: _obscurePassword,
                 decoration: _inputDecoration(
                   '************',
@@ -123,7 +256,7 @@ class _RegisterPageState extends State<RegisterView> {
               ),
               const SizedBox(height: 10),
 
-              // Tombol daftar
+              // Register Button
               SizedBox(
                 width: double.infinity,
                 height: 48,
@@ -134,7 +267,7 @@ class _RegisterPageState extends State<RegisterView> {
                       borderRadius: BorderRadius.circular(10),
                     ),
                   ),
-                  onPressed: _agreeTerms ? () {} : null,
+                  onPressed: _agreeTerms ? _handleRegister : null,
                   child: Text(
                     'Daftar',
                     style: GoogleFonts.poppins(
@@ -146,7 +279,7 @@ class _RegisterPageState extends State<RegisterView> {
               ),
               const SizedBox(height: 32),
 
-              // Sudah punya akun
+              // Already have an account?
               Center(
                 child: Text.rich(
                   TextSpan(

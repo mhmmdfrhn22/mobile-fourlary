@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class GalleryDetailPage extends StatefulWidget {
   final Map<String, dynamic> post;
@@ -15,39 +17,45 @@ class _GalleryDetailPageState extends State<GalleryDetailPage> {
   List<Map<String, dynamic>> comments = [];
   bool isLoading = true;
   TextEditingController commentController = TextEditingController();
+  int currentUserId = 0;
+  String currentMode = 'new'; // 'new', 'edit', or 'reply'
+  Map<String, dynamic>? targetComment; // Used for editing or replying
+  String currentUsername = ''; // Store the current user's username
 
-  // URL API untuk mengambil komentar berdasarkan foto
   final String API_URL =
-      'https://backend-fourlary-production.up.railway.app/api/komentar-foto'; // URL yang sesuai dengan backend
+      'https://backend-fourlary-production.up.railway.app/api/komentar-foto';
 
-  // Fungsi untuk mengambil komentar dari API
+  // Function to get user data from SharedPreferences
+  Future<void> _getUserData() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      currentUserId = prefs.getInt('userId') ?? 0; // Get userId from SharedPreferences
+      currentUsername = prefs.getString('username') ?? ''; // Get username from SharedPreferences
+    });
+  }
+
   Future<void> fetchComments() async {
     try {
       final response = await http.get(
-        Uri.parse(
-          '$API_URL/${widget.post['id_foto']}',
-        ), // Mengambil komentar berdasarkan id foto
+        Uri.parse('$API_URL/${widget.post['id_foto']}'),
       );
-      print('ID Foto: ${widget.post['id_foto']}');
-      print('Status Code: ${response.statusCode}');
-      print('Response Body: ${response.body}');
-
       if (response.statusCode == 200) {
         final List<dynamic> data = json.decode(response.body);
 
         setState(() {
           comments = data.map((item) {
             return {
-              'user': item['username']?.toString() ?? 'User',
-              'comment':
-                  item['isi_komentar']?.toString() ?? 'Tidak ada komentar',
-              'replies': item['replies'] ?? [], // Memastikan balasan tersedia
+              'user': item['username'] ?? 'User',
+              'comment': item['isi_komentar'] ?? 'Tidak ada komentar',
+              'replies': item['replies'] ?? [],
+              'commentDate': item['tanggal_komentar'] ?? '',
+              'id_user': item['id_user'],
+              'id_komentar': item['id_komentar'],
             };
           }).toList();
           isLoading = false;
         });
       } else {
-        print('Failed to load comments. Status code: ${response.statusCode}');
         throw Exception('Failed to load comments');
       }
     } catch (e) {
@@ -58,26 +66,37 @@ class _GalleryDetailPageState extends State<GalleryDetailPage> {
     }
   }
 
-  // Fungsi untuk mengirim komentar baru
-  Future<void> sendComment(String comment) async {
+  Future<void> sendComment(String comment, {int? parentId}) async {
     try {
+      print('Mengirim komentar...');
+      print('Komentar: $comment');
+      print('parentId: $parentId');
+      print('ID Foto: ${widget.post['id_foto']}');  // Pastikan id_foto ada di sini
+
       final response = await http.post(
-        Uri.parse(
-          'https://backend-fourlary-production.up.railway.app/api/komentar-foto',
-        ),
+        Uri.parse(API_URL),
         headers: {'Content-Type': 'application/json'},
         body: json.encode({
-          'id_foto': widget.post['id'],
-          'id_user': 1, // Ganti dengan ID user yang aktif
+          'id_foto': widget.post['id_foto'],
+          'id_user': currentUserId,
           'isi_komentar': comment,
-          'parent_id': null, // Ganti jika komentar ini adalah balasan
+          'parent_id': parentId,
         }),
       );
 
-      if (response.statusCode == 200) {
-        fetchComments(); // Refresh komentar setelah berhasil kirim
+      print('Status code: ${response.statusCode}');
+      print('Response body: ${response.body}');
+
+      // Gantilah pengecekan status code 200 dengan 201
+      if (response.statusCode == 201) {
+        print('Komentar berhasil dikirim');
+        fetchComments(); // Refresh comments after send
         commentController.clear(); // Clear input field
+        setState(() {
+          currentMode = 'new'; // Reset mode back to 'new' after sending reply
+        });
       } else {
+        print('Gagal mengirim komentar. Status code: ${response.statusCode}');
         throw Exception('Failed to send comment');
       }
     } catch (e) {
@@ -85,10 +104,48 @@ class _GalleryDetailPageState extends State<GalleryDetailPage> {
     }
   }
 
+  Future<void> deleteComment(int commentId) async {
+    try {
+      final response = await http.delete(Uri.parse('$API_URL/$commentId'));
+      if (response.statusCode == 200) {
+        fetchComments(); // Refresh comments after delete
+      } else {
+        throw Exception('Failed to delete comment');
+      }
+    } catch (e) {
+      print('Error deleting comment: $e');
+    }
+  }
+
+  Future<void> editComment(int commentId, String newComment) async {
+    try {
+      final response = await http.put(
+        Uri.parse('$API_URL/$commentId'),
+        headers: {'Content-Type': 'application/json'},
+        body: json.encode({'isi_komentar': newComment}),
+      );
+      if (response.statusCode == 200) {
+        fetchComments(); // Refresh comments after edit
+      } else {
+        throw Exception('Failed to edit comment');
+      }
+    } catch (e) {
+      print('Error editing comment: $e');
+    }
+  }
+
+  String formatDate(String date) {
+    final DateTime parsedDate = DateTime.parse(date);
+    final DateFormat formatter = DateFormat('dd MMM yyyy');
+    return formatter.format(parsedDate);
+  }
+
   @override
   void initState() {
     super.initState();
-    fetchComments(); // Memanggil API saat halaman pertama kali dibuka
+    print('ID Foto di DetailPage: ${widget.post['id_foto']}'); // Memastikan ID foto diterima dengan benar
+    _getUserData(); // Get user data when the page is opened
+    fetchComments(); // Fetch comments
   }
 
   @override
@@ -103,7 +160,6 @@ class _GalleryDetailPageState extends State<GalleryDetailPage> {
       ),
       body: Column(
         children: [
-          // 🔹 Hero Image
           Hero(
             tag: widget.post['image'],
             child: AspectRatio(
@@ -115,14 +171,15 @@ class _GalleryDetailPageState extends State<GalleryDetailPage> {
               ),
             ),
           ),
-
-          // 🔹 Caption
           Padding(
             padding: const EdgeInsets.all(14.0),
             child: Row(
               children: [
                 CircleAvatar(
-                  backgroundImage: NetworkImage(widget.post['profile']),
+                  child: Text(
+                    widget.post['username'][0].toUpperCase(),
+                    style: const TextStyle(fontWeight: FontWeight.bold),
+                  ),
                   radius: 18,
                 ),
                 const SizedBox(width: 10),
@@ -149,10 +206,7 @@ class _GalleryDetailPageState extends State<GalleryDetailPage> {
               ],
             ),
           ),
-
           const Divider(height: 1),
-
-          // 🔹 List komentar
           isLoading
               ? Center(child: CircularProgressIndicator())
               : Expanded(
@@ -189,50 +243,100 @@ class _GalleryDetailPageState extends State<GalleryDetailPage> {
                                 ],
                               ),
                             ),
-                            trailing: const Icon(Iconsax.heart, size: 18),
                           ),
-                          // 🔹 Menampilkan balasan jika ada
+                          // Tanggal Komentar
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16.0),
+                            child: Text(
+                              formatDate(c['commentDate']),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                          // Balasan dengan format "Balasan dari @username"
                           if (c['replies'].isNotEmpty)
                             Padding(
                               padding: const EdgeInsets.only(left: 16.0),
                               child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: c['replies'].map<Widget>((reply) {
-                                  return ListTile(
-                                    leading: CircleAvatar(
-                                      child: Text(
-                                        reply['user'][0].toUpperCase(),
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.bold,
+                                  return Padding(
+                                    padding: const EdgeInsets.only(left: 16.0),
+                                    child: Row(
+                                      children: [
+                                        const Icon(
+                                          Iconsax.repeat,
+                                          size: 14,
+                                          color: Colors.black,
                                         ),
-                                      ),
-                                    ),
-                                    title: Text.rich(
-                                      TextSpan(
-                                        text: '${reply['user']} ',
-                                        style: const TextStyle(
-                                          fontWeight: FontWeight.w700,
-                                        ),
-                                        children: [
-                                          TextSpan(
-                                            text: reply['comment'],
-                                            style: const TextStyle(
-                                              fontWeight: FontWeight.w400,
-                                            ),
+                                        const SizedBox(width: 5),
+                                        Text(
+                                          "Balas @${reply['username']}: ${reply['isi_komentar']}",
+                                          style: const TextStyle(
+                                            fontSize: 14,
+                                            fontWeight: FontWeight.w400,
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
                                     ),
                                   );
                                 }).toList(),
                               ),
                             ),
+                          // Tombol Balas, Edit, Hapus
+                          Padding(
+                            padding: const EdgeInsets.only(left: 16.0),
+                            child: Row(
+                              children: [
+                                if (currentMode == 'new')
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        currentMode = 'reply';
+                                        targetComment = c;
+                                      });
+                                    },
+                                    child: const Text(
+                                      "Balas",
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                if (c['id_user'] == currentUserId) ...[
+                                  // Hanya bisa edit atau hapus komentar milik pengguna
+                                  TextButton(
+                                    onPressed: () {
+                                      setState(() {
+                                        currentMode = 'edit';
+                                        targetComment = c;
+                                        commentController.text = c['comment'];
+                                      });
+                                    },
+                                    child: const Text(
+                                      "Edit",
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      deleteComment(c['id_komentar']);
+                                    },
+                                    child: const Text(
+                                      "Hapus",
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ],
                       );
                     },
                   ),
                 ),
-
-          // 🔹 Input komentar bawah
+          // Input komentar (mode baru, reply, atau edit)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
             decoration: BoxDecoration(
@@ -241,9 +345,10 @@ class _GalleryDetailPageState extends State<GalleryDetailPage> {
             ),
             child: Row(
               children: [
-                const CircleAvatar(
-                  backgroundImage: NetworkImage(
-                    'https://i.pravatar.cc/150?img=15',
+                CircleAvatar(
+                  child: Text(
+                    currentUsername.isNotEmpty ? currentUsername[0].toUpperCase() : '',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                   radius: 16,
                 ),
@@ -251,8 +356,12 @@ class _GalleryDetailPageState extends State<GalleryDetailPage> {
                 Expanded(
                   child: TextField(
                     controller: commentController,
-                    decoration: const InputDecoration(
-                      hintText: "Tambahkan komentar...",
+                    decoration: InputDecoration(
+                      hintText: currentMode == 'reply'
+                          ? 'Balas @${targetComment?['user']}...'
+                          : currentMode == 'edit'
+                              ? 'Edit komentar...'
+                              : 'Tambahkan komentar...',
                       border: InputBorder.none,
                       isDense: true,
                     ),
@@ -263,7 +372,17 @@ class _GalleryDetailPageState extends State<GalleryDetailPage> {
                   onPressed: () {
                     String comment = commentController.text.trim();
                     if (comment.isNotEmpty) {
-                      sendComment(comment); // Kirim komentar
+                      if (currentMode == 'reply' && targetComment != null) {
+                        sendComment(
+                          comment,
+                          parentId: targetComment?['id_komentar'],
+                        );
+                      } else if (currentMode == 'edit' &&
+                          targetComment != null) {
+                        editComment(targetComment?['id_komentar'], comment);
+                      } else {
+                        sendComment(comment); // Send new comment
+                      }
                     }
                   },
                 ),

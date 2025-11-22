@@ -37,6 +37,9 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
   @override
   Widget build(BuildContext context) {
+    double screenHeight = MediaQuery.of(context).size.height;
+    double screenWidth = MediaQuery.of(context).size.width;
+    
     return Scaffold(
       backgroundColor: Colors.white,
       body: SafeArea(
@@ -53,27 +56,28 @@ class _OnboardingPageState extends State<OnboardingPage> {
                 itemBuilder: (context, index) {
                   final data = onboardingData[index];
                   return Padding(
-                    padding: const EdgeInsets.all(24.0),
+                    padding: EdgeInsets.all(screenWidth * 0.08), // Larger padding for the view
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Image.asset(data["image"]!, height: 520),
-                        const SizedBox(height: 52),
+                        // Larger image size for more prominent visuals
+                        Image.asset(data["image"]!, height: screenHeight * 0.4), 
+                        SizedBox(height: screenHeight * 0.06), // Adjust spacing between image and text
                         Text(
                           data["title"]!,
                           textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(
-                            fontSize: 24,
+                            fontSize: screenWidth * 0.065, // Adjusted font size for the title
                             fontWeight: FontWeight.w600,
                             color: AppColors.textDark,
                           ),
                         ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: screenHeight * 0.02), // Adjust space for subtitle
                         Text(
                           data["subtitle"]!,
                           textAlign: TextAlign.center,
                           style: GoogleFonts.poppins(
-                            fontSize: 14,
+                            fontSize: screenWidth * 0.04, // Adjusted font size for the subtitle
                             color: AppColors.textLight,
                           ),
                         ),
@@ -104,11 +108,11 @@ class _OnboardingPageState extends State<OnboardingPage> {
               ),
             ),
 
-            const SizedBox(height: 24),
+            SizedBox(height: screenHeight * 0.03), // Adjust spacing for button
 
             // Button
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+              padding: EdgeInsets.symmetric(horizontal: screenWidth * 0.08, vertical: screenHeight * 0.02), // Adjust padding for button
               child: SizedBox(
                 width: double.infinity,
                 height: 52,
