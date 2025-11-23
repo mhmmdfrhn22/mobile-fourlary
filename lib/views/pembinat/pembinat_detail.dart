@@ -77,8 +77,7 @@ class _PembinatDetailPageState extends State<PembinatDetailPage> {
                 'https://res.cloudinary.com/dprywyfwm/image/upload/vdefault/default-user.png';
             final pembimbingName = pembimbing['nama'] ?? 'Tidak ada pembimbing';
             final pembimbingDescription =
-                pembimbing['deskripsi'] ??
-                'Deskripsi pembimbing tidak tersedia.';
+                pembimbing['deskripsi'] ?? 'Deskripsi pembimbing tidak tersedia.';
             final pembimbingContact =
                 pembimbing['link_wa'] ?? 'https://wa.me/6280000000000';
 
@@ -139,31 +138,33 @@ class _PembinatDetailPageState extends State<PembinatDetailPage> {
                         radius: 30,
                       ),
                       const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            pembimbingName,
-                            style: const TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Container(
-                            width: MediaQuery.of(context).size.width * 0.7,
-                            child: Text(
-                              pembimbingDescription,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[600],
-                                height: 1.5, // Adjusted height for better readability
+                      Expanded(  // Wrap the column inside an Expanded widget for dynamic sizing
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              pembimbingName,
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
                               ),
-                              maxLines: 3, // Limited to 3 lines
-                              overflow: TextOverflow.ellipsis,
                             ),
-                          ),
-                        ],
+                            const SizedBox(height: 4),
+                            Container(
+                              width: double.infinity,  // Allow the text to expand as needed
+                              child: Text(
+                                pembimbingDescription,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[600],
+                                  height: 1.5, // Adjusted height for better readability
+                                ),
+                                maxLines: 3, // Limit text to 3 lines
+                                overflow: TextOverflow.ellipsis, // Prevent overflow
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -188,9 +189,7 @@ class _PembinatDetailPageState extends State<PembinatDetailPage> {
                           backgroundColor:
                               Colors.green.shade600, // Background color
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(
-                              12,
-                            ), // Rounded corners
+                            borderRadius: BorderRadius.circular(12), // Rounded corners
                           ),
                         ),
                         child: const Text(

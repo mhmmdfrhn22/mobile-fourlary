@@ -3,11 +3,12 @@ import 'package:iconsax/iconsax.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:intl/intl.dart'; // Add this import for date formatting
+import 'package:shared_preferences/shared_preferences.dart'; // For SharedPreferences
 import '../news/news_detail_page.dart';
 import '../main_layout.dart';
 import '../auth/login_view.dart';
 import '../pembinat/pembinat_page.dart'; // Add this import for Pembinat page
-import 'package:shared_preferences/shared_preferences.dart'; // For SharedPreferences
+import '/user_preferences.dart'; // Import for user preferences
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -86,7 +87,6 @@ class _HomePageState extends State<HomePage> {
         List<dynamic> data = json.decode(response.body);
         setState(() {
           galleryList = data.take(4).map((item) {
-            // Fetch more images if needed
             return {
               'image': item['url_foto'],
               'caption': item['deskripsi'] ?? 'No description',
@@ -182,8 +182,9 @@ class _HomePageState extends State<HomePage> {
                                     color: Colors.redAccent,
                                   ),
                                 ),
-                                onTap: () {
-                                  Navigator.pop(context);
+                                onTap: () async {
+                                  // Handle logout
+                                  await UserPreferences.logOut();
                                   Navigator.pushReplacement(
                                     context,
                                     MaterialPageRoute(

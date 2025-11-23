@@ -14,23 +14,24 @@ class NewsPage extends StatefulWidget {
 
 class _NewsPageState extends State<NewsPage> {
   int selectedIndex = 0;
-  List<String> categories = []; // List kategori yang diambil dari API
+  List<String> categories = []; // List of categories fetched from API
   List<Map<String, dynamic>> newsList = [];
+  List<Map<String, dynamic>> filteredNewsList = []; // List to hold filtered news
 
   @override
   void initState() {
     super.initState();
-    fetchNews(); // Memanggil fungsi untuk fetch data berita dari API
+    fetchNews(); // Fetch data from API
   }
 
-  // Fungsi untuk mengambil data berita dan kategori dari API
+  // Function to fetch news and categories from API
   Future<void> fetchNews() async {
     try {
       final response = await http.get(Uri.parse('https://backend-fourlary-production.up.railway.app/api/posts'));
       if (response.statusCode == 200) {
         List<dynamic> data = json.decode(response.body);
 
-        // Ambil kategori yang unik dari data
+        // Extract unique categories from the data
         final uniqueCategories = <String>[];
         for (var item in data) {
           if (item['kategori'] != null && !uniqueCategories.contains(item['kategori'])) {
@@ -39,7 +40,7 @@ class _NewsPageState extends State<NewsPage> {
         }
 
         setState(() {
-          categories = ['All', ...uniqueCategories]; // Tambahkan "All" di depan daftar kategori
+          categories = ['All', ...uniqueCategories]; // Add "All" at the beginning of the categories list
           newsList = data
               .where((item) => item['status']?.toLowerCase() == 'published')
               .map((item) {
@@ -52,19 +53,31 @@ class _NewsPageState extends State<NewsPage> {
                   'content': item['isi'] ?? '',
                 };
               }).toList();
+          filteredNewsList = newsList; // Initially show all news
         });
       } else {
-        throw Exception('Gagal mengambil data berita');
+        throw Exception('Failed to load news');
       }
     } catch (error) {
       print('Error fetching news: $error');
     }
   }
 
-  // Fungsi untuk memformat tanggal
+  // Function to format date
   String formatDate(String dateString) {
     final DateTime date = DateTime.parse(dateString);
     return DateFormat('dd MMM yyyy').format(date); // Format: 18 Nov 2025
+  }
+
+  // Function to filter news based on selected category
+  void filterNewsByCategory(String category) {
+    setState(() {
+      if (category == 'Semua') {
+        filteredNewsList = newsList; // Show all news if "All" is selected
+      } else {
+        filteredNewsList = newsList.where((news) => news['category'] == category).toList();
+      }
+    });
   }
 
   @override
@@ -117,7 +130,7 @@ class _NewsPageState extends State<NewsPage> {
 
               const SizedBox(height: 20),
 
-              // 🔹 Categories (Menggunakan kategori yang diambil dari API)
+              // 🔹 Categories (Displaying categories from API)
               SizedBox(
                 height: 38,
                 child: ListView.builder(
@@ -126,7 +139,12 @@ class _NewsPageState extends State<NewsPage> {
                   itemBuilder: (context, index) {
                     final isSelected = selectedIndex == index;
                     return GestureDetector(
-                      onTap: () => setState(() => selectedIndex = index),
+                      onTap: () {
+                        setState(() {
+                          selectedIndex = index;
+                          filterNewsByCategory(categories[index]); // Filter news based on selected category
+                        });
+                      },
                       child: Container(
                         margin: const EdgeInsets.only(right: 10),
                         padding: const EdgeInsets.symmetric(
@@ -153,14 +171,14 @@ class _NewsPageState extends State<NewsPage> {
 
               const SizedBox(height: 20),
 
-              // 🔹 News List
+              // 🔹 News List (Display the filtered news list)
               Expanded(
-                child: newsList.isEmpty
+                child: filteredNewsList.isEmpty
                     ? const Center(child: CircularProgressIndicator()) // Loading indicator
                     : ListView.builder(
-                        itemCount: newsList.length,
+                        itemCount: filteredNewsList.length,
                         itemBuilder: (context, index) {
-                          final news = newsList[index];
+                          final news = filteredNewsList[index];
                           return GestureDetector(
                             onTap: () {
                               Navigator.push(
@@ -235,7 +253,7 @@ class _NewsPageState extends State<NewsPage> {
                                               ),
                                               const SizedBox(width: 6),
                                               Text(
-                                                '• ${formatDate(news['date'])}', // Memformat tanggal
+                                                '• ${formatDate(news['date'])}', // Format date
                                                 style: TextStyle(
                                                   color: Colors.grey[500],
                                                   fontSize: 12,

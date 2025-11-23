@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter/gestures.dart'; // This is important for TapGestureRecognizer
+import 'package:flutter/gestures.dart'; // For TapGestureRecognizer
 import 'package:shared_preferences/shared_preferences.dart'; // For SharedPreferences
 import 'dart:convert'; // For JSON decoding
 import 'package:http/http.dart' as http; // For API request

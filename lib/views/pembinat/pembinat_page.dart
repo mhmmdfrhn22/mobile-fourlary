@@ -45,7 +45,7 @@ class _PembinatPageState extends State<PembinatPage> {
             };
           }).toList();
           categories = [
-            'All',
+            'Semua', // Adding "Semua" as the default category
             ...result.map((item) => item['nama_jurusan']).toSet().toList(),
           ];
           isLoading = false;
@@ -61,9 +61,7 @@ class _PembinatPageState extends State<PembinatPage> {
   List<Map<String, dynamic>> get filteredData {
     return pembinatList.where((item) {
       final searchMatch =
-          item['nama_pekerjaan'].toLowerCase().contains(
-            searchTerm.toLowerCase(),
-          ) ||
+          item['nama_pekerjaan'].toLowerCase().contains(searchTerm.toLowerCase()) ||
           item['deskripsi'].toLowerCase().contains(searchTerm.toLowerCase());
       final jurusanMatch =
           jurusanFilter == 'Semua' || item['nama_jurusan'] == jurusanFilter;
@@ -102,9 +100,14 @@ class _PembinatPageState extends State<PembinatPage> {
                   children: [
                     const Icon(Iconsax.search_normal, color: Colors.grey),
                     const SizedBox(width: 8),
-                    const Expanded(
+                    Expanded(
                       child: TextField(
-                        decoration: InputDecoration(
+                        onChanged: (value) {
+                          setState(() {
+                            searchTerm = value;
+                          });
+                        },
+                        decoration: const InputDecoration(
                           hintText: 'Cari Sekarang',
                           border: InputBorder.none,
                           isDense: true,
@@ -118,10 +121,9 @@ class _PembinatPageState extends State<PembinatPage> {
                   ],
                 ),
               ),
-
               const SizedBox(height: 20),
 
-              // 🔹 Categories (Category filter)
+              // 🔹 Categories (Jurusan filter)
               SizedBox(
                 height: 38,
                 child: ListView.builder(
@@ -164,7 +166,7 @@ class _PembinatPageState extends State<PembinatPage> {
               // 🔹 Pembinat List (Display Pembinat data)
               Expanded(
                 child: isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? const Center(child: CircularProgressIndicator()) // Loading indicator
                     : ListView.builder(
                         itemCount: filteredData.length,
                         itemBuilder: (context, index) {
